@@ -179,49 +179,6 @@ positions.forEach((p,i)=>{const pos=pointOnTrack(track,p-i*.0015);g.save();g.tra
 g.fillStyle='#dffff6';g.font='bold 16px system-ui';g.textAlign='left';g.fillText(circuit().name,16,28);g.font='12px system-ui';g.fillStyle='#a8c8d2';g.fillText(circuit().length+' / '+circuit().tag+' / START-FINISH',17,47);
 g.fillText('● PLAYER   ● RIVALS',17,h-13);g.textAlign='right';g.fillText('TRACK LAYOUT · TOP VIEW',w-17,h-13);eventOverlay(g,w,h,positions[0]||0);if(s.weather?.condition==='rain'){g.save();g.strokeStyle='#a7cfe460';g.lineWidth=1;for(let i=0;i<(s.settings?.quality==='low'?18:55);i++){const x=(i*47+cameraFrame*3)%w,y=(i*71+cameraFrame*6)%h;g.beginPath();g.moveTo(x,y);g.lineTo(x-7,y+17);g.stroke()}g.restore()}if(s.raceSession?.live?.waiting){g.fillStyle='#ffbd79';g.font='bold 17px system-ui';g.textAlign='left';g.fillText('RED FLAG / VEHICLE STOPPED',18,74)}
 }
-function drawRetirementScene(t,progress){
-const canvas=document.querySelector('#track');if(!canvas)return;
-const g=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
-g.save();
-const active=t>=.44&&t<.68;
-if(cameraMode==='overhead'){
- const track=getTrack(circuitId),p=pointOnTrack(track,progress);
- g.translate(p.x+28,p.y+24);
- g.fillStyle='#f8bf68';g.fillRect(-19,-9,38,18);g.fillStyle='#132c37';g.fillRect(-7,-6,13,12);
- g.fillStyle='#f7edf0';g.fillRect(-15,6,8,4);g.fillRect(7,6,8,4);
- if(active){g.translate(36*Math.min(1,(t-.44)/.24),15);g.fillStyle='#eac566';g.fillRect(-17,-8,35,15);g.fillStyle='#ffffff';g.font='bold 9px monospace';g.fillText('RESCUE',-17,-12)}
-}else{
- if(t<.68){g.fillStyle='#162733';g.fillRect(w*.62,h*.64,140,42);g.fillStyle='#eabf6b';g.fillRect(w*.64,h*.58,104,42);g.fillStyle='#b3def1';g.fillRect(w*.67,h*.6,39,16);
- if(active){g.fillStyle='#f8d56a';g.font='bold 18px monospace';g.fillText('RECOVERY',w*.63,h*.52)}}
-}
-g.restore();g.fillStyle='#e8f2f3';g.fillRect(0,76,w,33);g.fillStyle='#8f1823';g.fillRect(0,76,w*.16,33);g.font='bold 17px system-ui';g.textAlign='left';g.fillStyle='#172b38';g.fillText(t<.44?'DNF / VEHICLE STOPPED':t<.68?'RED FLAG / VEHICLE RECOVERY':'RACE RESUMED / DNF',w*.18,98);
-}
-function animateRace(place){
-let frameNo=0;const total=300, names=['YOU / #01','HAWK / #12','NOVA / #07','RIFT / #24'];
-const playerFinish=1.01-(place-1)*.018;
-const endSpeeds=[playerFinish,1.008,.998,.988];
-if(place>1){const order=[1,2,3].slice(0,place-1);order.forEach((id,i)=>endSpeeds[id]=playerFinish+.012*(place-i))}
-else{endSpeeds[1]=.995;endSpeeds[2]=.986;endSpeeds[3]=.975}
-const finishResult=()=>{raceAnim=null;const el=document.querySelector('#pit-alert');if(el)el.textContent=raceDnfReplay?'DNF — 車両回収完了':'FINISH — '+place+'位 / 4台　レース終了';notice(raceDnfReplay?'リタイア：車両回収完了':place+'位でフィニッシュ！')};
-function tick(){
-const canvas=document.querySelector('#track');if(!canvas){raceAnim=null;return}
-frameNo++;const t=Math.min(frameNo/total,1);const lap= Math.min(5,Math.floor(t*5)+1);
-const underControl=raceReplayEvents.some(e=>e.type==='safety')&&t>=.40&&t<.59;const neutralTime=underControl?.40:t;const advances=endSpeeds.map((v,i)=>Math.max(0,(raceDnfReplay&&i===0&&t>=.42?.42:neutralTime)*v+(i===0?0:Math.sin(neutralTime*17+i)*.0025)));
-drawRace(advances);if(raceDnfReplay&&t>=.42){drawRetirementScene(t,advances[0])}const eventNode=document.querySelector('#race-event-text');if(eventNode){eventNode.textContent=t<.12?'スタート！ 観客が一斉に立ち上がりました':t<.40?'スタンドから声援が送られています':t<.58?'ピットウィンドウ / スポンサー中継':t<.80?'終盤戦！ 観客の熱気が高まっています':'ファイナルラップ / フィニッシュ間近'}
-const visibleEvents=raceReplayEvents.filter(e=>e.t<=t);const lastEvent=visibleEvents[visibleEvents.length-1];if(eventNode&&lastEvent)eventNode.textContent=lastEvent.message;const flag=document.querySelector('#race-flag-indicator'),history=document.querySelector('#race-event-history'),overtakes=document.querySelector('#race-overtakes');const red=raceDnfReplay&&t>=.44&&t<.68;const sc=!red&&raceReplayEvents.some(e=>e.type==='safety')&&t>=.40&&t<.59;const yellow=raceReplayEvents.some(e=>e.type==='yellow')&&t>=.23&&t<.40;if(flag){flag.className='race-flag '+(red?'yellow':sc?'safety':yellow?'yellow':'green');flag.textContent=red?'RED FLAG / 競技中断':sc?'SAFETY CAR / 追い越し禁止':yellow?'YELLOW FLAG / 黄旗':'GREEN FLAG / 走行中'}if(history)history.innerHTML=visibleEvents.slice().reverse().map(e=>'<div>'+e.message+'</div>').join('')||'レース進行中';if(overtakes)overtakes.textContent=(underControl||red)?'OVERTAKES PROHIBITED':('OVERTAKES '+(t>=.76?1:0));const ranked=advances.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
-const position=raceDnfReplay&&t>=.42?'DNF':ranked.findIndex(v=>v.i===0)+1;
-const lapEl=document.querySelector('#hud-lap'),posEl=document.querySelector('#hud-pos'),clockEl=document.querySelector('#hud-clock'),progressEl=document.querySelector('#hud-progress'),board=document.querySelector('#timing-board'),alert=document.querySelector('#pit-alert');
-if(lapEl)lapEl.textContent=lap+' / 5';
-if(posEl)posEl.textContent=position+' / 4';
-if(clockEl){const seconds=t*395;clockEl.textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(Math.floor(seconds%60)).padStart(2,'0')+'.'+Math.floor(seconds%1*10)}
-if(progressEl)progressEl.style.width=(t*100).toFixed(1)+'%';
-if(board)board.innerHTML=ranked.map((r,j)=>'<div class="timing-row '+(r.i===0?'me':'')+'"><b>'+(j+1)+'</b><span>'+names[r.i]+'</span><span>'+((r.v*5).toFixed(2))+' LAP</span><span class="delta">'+(j===0?'LEAD':'+'+((ranked[0].v-r.v)*93).toFixed(1)+'s')+'</span></div>').join('');
-if(alert){const pit=t>.46&&t<.61;alert.textContent=pit?'PIT WINDOW — '+(s.lastRace?.includes('ピット：tires')?'タイヤ交換中':s.lastRace?.includes('ピット：repair')?'応急整備中':'ノーピット作戦'):t>=1?'FINISH — '+place+'位 / 4台':lap===5?'FINAL LAP — 最終周回':'RACE LIVE — LAP '+lap+' / 5'}
-if(frameNo<total)raceAnim=requestAnimationFrame(tick);else finishResult()
-}
-raceAnim=requestAnimationFrame(tick)
-}
-
 /* GRIDLIFE BATCH INTEGRATION: all new state additive; no save-key change */
 s.team={skill:1,contracts:1,sponsor:0,...(s.team||{})};
 s.property=Number.isFinite(s.property)?s.property:0;
