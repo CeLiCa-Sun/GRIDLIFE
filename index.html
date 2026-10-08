@@ -258,6 +258,7 @@ function exportSave(){
  if(typeof navigator!=='undefined'&&navigator.clipboard?.writeText)navigator.clipboard.writeText(payload).catch(()=>{});
  notice('セーブを書き出しました。表示欄の内容をコピーして保管してください')
 }
+function normalizeLiveShape(v){const defaults=batchInitial();for(const [k,val] of Object.entries(defaults)){if(v[k]===undefined||v[k]===null)v[k]=JSON.parse(JSON.stringify(val))}if(!Array.isArray(v.elapsed)||v.elapsed.length!==4)v.elapsed=[0,0,0,0];if(!Array.isArray(v.rivals)||v.rivals.length!==3)v.rivals=defaults.rivals;if(!Array.isArray(v.telemetry))v.telemetry=[];if(!Array.isArray(v.events))v.events=[];if(!Array.isArray(v.laps))v.laps=[];v.paused=true;return v}
 function normalizeGameState(obj){
  const def=init(),car={...def.car,...(obj.car||{})};
  car.damage={...def.car.damage,...(car.damage||{})};obj.car=car;obj.city={...def.city,...(obj.city||{})};obj.autos={...def.autos,...(obj.autos||{})};
