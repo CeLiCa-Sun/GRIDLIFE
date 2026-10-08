@@ -14,4 +14,6 @@ jobs:
         with:
           node-version: '22'
       - name: Run regression suite
-        run: node tests/regression.js
+        run: |
+          node tests/regression.js
+          node tests/integration.js
