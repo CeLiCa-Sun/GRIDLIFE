@@ -46,12 +46,29 @@ function drawPerspectiveRoad(g,w,h,progress,lean){
   if(z%6===0){g.strokeStyle='#e0d6a8';g.lineWidth=2;for(const side of [-1.85,1.85]){let p=point(q,side),height=7+22/(.3+q);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(p.x,p.y-height);g.stroke()}}
  }
 }
+function environmentObject(g,x,y,size,type){
+ g.save();g.translate(x,y);g.scale(size,size);
+ if(type==='tree'){g.fillStyle='#483e37';g.fillRect(-3,-21,6,23);g.fillStyle='#285a49';g.beginPath();g.moveTo(0,-65);g.lineTo(-27,-15);g.lineTo(27,-15);g.closePath();g.fill();g.fillStyle='#3e8064';g.beginPath();g.moveTo(0,-75);g.lineTo(-19,-32);g.lineTo(19,-32);g.fill()}
+ if(type==='lamp'){g.strokeStyle='#9caeb1';g.lineWidth=4;g.beginPath();g.moveTo(0,0);g.lineTo(0,-70);g.lineTo(24,-70);g.stroke();g.fillStyle='#ffe6a3';g.fillRect(16,-70,14,6);g.fillStyle='#ffe8ab30';g.beginPath();g.moveTo(23,-63);g.lineTo(-12,7);g.lineTo(57,7);g.fill()}
+ if(type==='crane'){g.strokeStyle='#aab8b9';g.lineWidth=5;g.beginPath();g.moveTo(0,0);g.lineTo(0,-100);g.lineTo(65,-100);g.moveTo(-15,-84);g.lineTo(65,-100);g.stroke();g.lineWidth=2;g.beginPath();g.moveTo(42,-100);g.lineTo(42,-45);g.stroke();g.fillStyle='#c5ab65';g.fillRect(32,-44,20,12)}
+ if(type==='stand'){g.fillStyle='#344c64';g.beginPath();g.moveTo(-36,-12);g.lineTo(42,-12);g.lineTo(29,-55);g.lineTo(-18,-55);g.closePath();g.fill();for(let i=0;i<4;i++){g.fillStyle=i%2?'#ecae75':'#8dcde8';g.fillRect(-20+i*14,-48,9,6)}g.fillStyle='#bdd1d2';g.fillRect(-41,-61,86,7)}
+ if(type==='barrier'){g.fillStyle='#cbd4d0';g.fillRect(-33,-12,66,12);for(let i=0;i<4;i++){g.fillStyle=i%2?'#dc6c65':'#ffffff';g.fillRect(-33+i*17,-12,17,7)}}
+ g.restore()
+}
+function drawTracksidePerspective(g,w,h,progress,lean){
+ const id=s.raceSession?.circuit||circuitId,types=id==='mountain'?['tree','tree','barrier']:id==='harbor'?['crane','lamp','barrier']:id==='endurance'?['stand','lamp','barrier']:['stand','tree','lamp'];
+ for(let i=13;i>=0;i--){const distance=(i+.65)/14,scale=.3+(1-distance)*1.9,bend=Math.sin(progress*23+distance*3.5)*65*(1-distance)+lean*26,y=148+(h-148)*(1-distance*distance);for(const side of [-1,1]){let x=w/2+bend+side*(60+distance*9)/(0.16+distance*2.6);environmentObject(g,x,y,scale,types[(i+(side===1?1:0))%types.length])}}
+}
+function drawTracksideMap(g,track){
+ const id=s.raceSession?.circuit||circuitId,types=id==='mountain'?['tree','tree','tree']:id==='harbor'?['crane','lamp','barrier']:id==='endurance'?['stand','lamp','stand']:['tree','stand','lamp'];
+ for(let i=0;i<track.samples.length;i+=17){let p=track.samples[i],next=track.samples[(i+2)%track.samples.length],angle=Math.atan2(next.y-p.y,next.x-p.x),side=i%2?1:-1,x=p.x-Math.sin(angle)*side*47,y=p.y+Math.cos(angle)*side*47;if(x<20||x>780||y<20||y>350)continue;environmentObject(g,x,y,.45,types[Math.floor(i/17)%types.length])}
+}
 function racePerspective(mode,positions){
 const c=$('#track');if(!c)return;const g=c.getContext('2d'),w=c.width,h=c.height;
 g.clearRect(0,0,w,h);const gradient=g.createLinearGradient(0,0,0,h);gradient.addColorStop(0,'#142e53');gradient.addColorStop(.52,'#3d6877');gradient.addColorStop(.53,'#466b63');gradient.addColorStop(1,'#202f3a');g.fillStyle=gradient;g.fillRect(0,0,w,h);
 const p=Math.max(0,positions[0]||0),phase=p*Math.PI*(circuit().shape==='mountain'?17:circuit().shape==='harbor'?7:10),corner=Math.sin(phase),targetLean=corner*1.0;cameraLean+=(targetLean-cameraLean)*.085;const shift=corner*72-cameraLean*18,curve=cameraLean*.22;const speed=72+Math.abs(Math.cos(phase))*112;cameraVelocity+=(speed-cameraVelocity)*.08;const shake=Math.sin(cameraFrame*1.3)*(cameraVelocity/184)*1.9;cameraFrame++;
 for(let i=0;i<12;i++){const x=i*81+((i*23)%47);g.fillStyle='#193546';g.fillRect(x,95+(i%3)*10,48,106);g.fillStyle='#b4d9c1';for(let j=0;j<3;j++)g.fillRect(x+8+j*12,112+(i%3)*10,4,5)}
-terrainBackdrop(g,w,h);drawPerspectiveRoad(g,w,h,p,cameraLean);
+terrainBackdrop(g,w,h);drawPerspectiveRoad(g,w,h,p,cameraLean);drawTracksidePerspective(g,w,h,p,cameraLean);
 g.save();g.translate(w/2+shift/3+shake,255+Math.sin(cameraFrame*.4)*cameraVelocity/85);g.rotate(curve*.11);
 if(mode==='chase'){
 g.fillStyle='#12202a';g.beginPath();g.ellipse(0,88,159,20,0,0,Math.PI*2);g.fill();
@@ -99,7 +116,7 @@ const canvas=$('#track');if(!canvas)return;const g=canvas.getContext('2d'),w=can
 g.clearRect(0,0,w,h);
 const bg=g.createLinearGradient(0,0,w,h);bg.addColorStop(0,circuit().sky);bg.addColorStop(1,'#183c39');g.fillStyle=bg;g.fillRect(0,0,w,h);terrainBackdrop(g,w,h);
 for(let i=0;i<85;i++){const x=(i*137+31)%w,y=(i*73+19)%h;g.fillStyle=i%3?'#487065':'#668178';g.fillRect(x,y,3+(i%4),3+(i%3))}
-trackStroke(g,track,75,'#384e4e');trackStroke(g,track,65,'#718692');trackStroke(g,track,56,'#1c303e');
+drawTracksideMap(g,track);trackStroke(g,track,75,'#384e4e');trackStroke(g,track,65,'#718692');trackStroke(g,track,56,'#1c303e');
 g.save();g.setLineDash([8,17]);trackStroke(g,track,2,'#c0ccd1');g.restore();
 const start=pointOnTrack(track,0),normal=start.angle+Math.PI/2;
 g.save();g.translate(start.x,start.y);g.rotate(start.angle);for(let i=0;i<8;i++){g.fillStyle=i%2?'#f8fafc':'#17222c';g.fillRect(-8,-23+i*6,16,6)}g.restore();
