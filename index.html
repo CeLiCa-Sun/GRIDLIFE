@@ -228,6 +228,7 @@ act=function(a,k){
  if(a==='batchPace'){if(batchLive()&&['safe','balanced','push'].includes(k)){s.raceSession.pace=k;render()}return}
  if(a==='batchPit'){if(batchLive()&&['no','tires','repair'].includes(k)){s.raceSession.pit=k;render()}return}
  if(a==='batchIncident'){let v=batchLive();if(!v||!v.waiting)return;v.waiting=false;v.paused=true;if(k==='retire'){v.retired=true;batchFinish();return}if(k==='repair'){v.elapsed[0]+=15;s.car.condition=clamp(s.car.condition+15,0,100);v.events.push('緊急ピット +15秒')}render();return}
+ if(a==='cancelRace'){if(!s.raceSession)return;if(!confirm('レースを棄権しますか？ エントリー代は返金されません。'))return;stopBatch();s.raceSession=null;raceAnim=null;log('レースを棄権');tab='dashboard';render();return}
  if(a==='teamTrain'){if(transact(2,12,650)){s.team.skill++;log('整備研修完了')}render();return}
  if(a==='teamSponsor'){if(transact(1,5,450)){s.team.sponsor++;log('スポンサー契約獲得')}render();return}
  if(a==='teamHire'){if(transact(1,4,800)){s.team.contracts++;s.staff++;log('スタッフ採用')}render();return}
@@ -236,9 +237,9 @@ act=function(a,k){
  if(a==='raceDecision'&&batchLive())return;
  return oldBatchAct(a,k)
 };
-const baseRacePage=pages.race;pages.race=()=>baseRacePage()+batchPanel();
+const baseRacePage=pages.race;pages.race=()=>baseRacePage()+batchPanel()+(s.raceSession?'<div class="actions"><button class="btn alt" data-action="cancelRace">レースを棄権する（返金なし）</button></div>':'');
 const baseGaragePage=pages.garage;pages.garage=()=>baseGaragePage()+'<section class="panel"><h3>チーム運営</h3><p>整備技能 Lv.'+s.team.skill+' / 契約スタッフ '+s.team.contracts+' / スポンサー '+s.team.sponsor+'</p><div class="actions"><button class="btn" data-action="teamTrain">研修 ¥650</button><button class="btn" data-action="teamHire">採用 ¥800</button><button class="btn" data-action="teamSponsor">営業 ¥450</button></div></section>';
 const baseCityPage=pages.city;pages.city=()=>baseCityPage()+'<section class="panel"><h3>不動産・事業用地</h3><p>所有区画 '+s.property+' / 毎日維持費 ¥'+(s.property*20)+'</p><button class="btn" data-action="land">用地購入 ¥'+fmt(1200+s.property*700)+'</button></section>';
-const baseDay=nextDay;nextDay=function(){if(batchLive())return notice('レース中');let prev=s.money,teamPay=s.team.contracts*65+s.property*20,sponsorSales=s.team.sponsor*150;baseDay();s.money+=sponsorSales-teamPay;entry('スポンサー収入',sponsorSales);entry('追加労務・土地費',-teamPay);render()};
+const baseDay=nextDay;nextDay=function(){if(s.raceSession){if(!confirm('レースが進行中です。中断して翌日に進みますか？ エントリー代は戻りません。'))return;stopBatch();s.raceSession=null;raceAnim=null;log('進行中のレースを中断した')}let teamPay=s.team.contracts*65+s.property*20,sponsorSales=s.team.sponsor*150;baseDay();s.money+=sponsorSales-teamPay;entry('スポンサー収入',sponsorSales);entry('追加労務・土地費',-teamPay);render()};
 render();})();
 </script></body></html>
