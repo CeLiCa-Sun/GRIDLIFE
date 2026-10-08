@@ -27,4 +27,6 @@ for(let i=0;i<250;i++){
 }
 for(let i=0;i<1100;i++)b.game.nextDay();
 assert.equal(s.day,1101);assert(Number.isFinite(s.money));assert.equal(s.races,250);assert(b.storage.gridlife_alpha_1);
-console.log('PASS: syntax, old-save migration, backup restoration, '+completed+' races, 1100 days');
+assert(b.app.innerHTML.includes('プレイガイド')===false,'Unexpected page before dashboard switch');
+assert.equal(s.season.year,26,'Season progression inconsistent');
+console.log('PASS: syntax, old-save migration, backup restoration, '+completed+' races, 1100 days, season progression');
