@@ -199,5 +199,45 @@ if(frameNo<total)raceAnim=requestAnimationFrame(tick);else finishResult()
 }
 raceAnim=requestAnimationFrame(tick)
 }
+
+/* GRIDLIFE BATCH INTEGRATION: all new state additive; no save-key change */
+s.team={skill:1,contracts:1,sponsor:0,...(s.team||{})};
+s.property=Number.isFinite(s.property)?s.property:0;
+s.lastTelemetry=Array.isArray(s.lastTelemetry)?s.lastTelemetry:[];
+let batchTimer=null;
+function stopBatch(){if(batchTimer!==null){clearTimeout(batchTimer);batchTimer=null}}
+function batchLive(){return s.raceSession?.live}
+function batchInitial(){return {lap:0,tire:100,elapsed:[0,0,0,0],positions:[0,0,0,0],telemetry:[],events:[],rivals:[1,2,3].map(()=>({tire:100,damage:0,pitted:false,retired:false})),paused:true,speed:1,waiting:false,retired:false,pitted:false,flags:'green'}}
+if(batchLive()){let v=batchLive();v.rivals=Array.isArray(v.rivals)&&v.rivals.length===3?v.rivals:batchInitial().rivals;v.telemetry=Array.isArray(v.telemetry)?v.telemetry:[];v.paused=true;v.speed=v.speed||1;v.waiting=!!v.waiting}
+function batchSchedule(){stopBatch();let v=batchLive();if(!v||v.paused||v.waiting)return;batchTimer=setTimeout(()=>{batchTimer=null;if(batchLive()&&!batchLive().paused){act('batchLap');batchSchedule()}},1400/(v.speed||1))}
+function batchTelemetry(items){if(!items||!items.length)return '';const points=(key,scale)=>items.map((p,i)=>(30+i*128)+','+(132-p[key]*scale)).join(' ');return '<section class="panel"><div class="eyebrow">TELEMETRY</div><svg viewBox="0 0 620 145" preserveAspectRatio="none" style="width:100%;height:150px;background:#112535"><polyline fill="none" stroke="#7de4c5" stroke-width="2" points="'+points('time',.8)+'"/><polyline fill="none" stroke="#eec77a" stroke-width="2" points="'+points('tire',1)+'"/><polyline fill="none" stroke="#8eb6ef" stroke-width="2" points="'+points('condition',1)+'"/></svg><p class="muted">緑＝ラップ秒数　黄＝タイヤ残量　青＝車両状態</p>'+items.map(x=>'<div class="log">LAP '+x.lap+' | '+x.time.toFixed(1)+'秒 | タイヤ '+x.tire+'% | 車両 '+x.condition+'%</div>').join('')+'</section>'}
+function batchPanel(){let v=batchLive();if(!v)return batchTelemetry(s.lastTelemetry);return '<section class="panel"><div class="eyebrow">LIVE RACE / '+v.lap+' OF 5</div><div class="cols"><div class="metric"><small>タイヤ</small><b>'+v.tire+'%</b></div><div class="metric"><small>車両</small><b>'+s.car.condition+'%</b></div><div class="metric"><small>総合秒数</small><b>'+v.elapsed[0].toFixed(1)+'</b></div></div><div class="actions" style="margin:12px 0"><button class="btn" data-action="batchPause">'+(v.paused?'▶ 再開':'⏸ 停止')+'</button><button class="btn" data-action="batchSpeed">'+v.speed+'倍速</button><button class="btn" data-action="batchLap" '+(v.waiting?'disabled':'')+'>次の周回</button></div><div class="actions"><button class="btn tiny" data-action="batchPace" data-key="safe">安全</button><button class="btn tiny" data-action="batchPace" data-key="balanced">標準</button><button class="btn tiny" data-action="batchPace" data-key="push">プッシュ</button></div><div class="actions" style="margin:8px 0"><button class="btn tiny" data-action="batchPit" data-key="no">無交換</button><button class="btn tiny" data-action="batchPit" data-key="tires">タイヤ交換</button><button class="btn tiny" data-action="batchPit" data-key="repair">ピット修理</button></div><div class="muted">戦略 '+escapeHTML(s.raceSession.pace)+' / '+escapeHTML(s.raceSession.pit)+'</div>'+(v.waiting?'<div class="actions"><button class="btn" data-action="batchIncident" data-key="continue">続行</button><button class="btn" data-action="batchIncident" data-key="repair">緊急修理</button><button class="btn" data-action="batchIncident" data-key="retire">リタイア</button></div>':'')+batchTelemetry(v.telemetry)+'</section>'}
+function batchFinish(){let v=batchLive();if(!v)return;stopBatch();let place=v.retired?4:1+v.elapsed.slice(1).filter(t=>t<v.elapsed[0]).length,prize=v.retired?0:Math.round([2600+s.races*140,1200+s.races*65,550+s.races*30,150][place-1]*circuit().prize);s.races++;s.money+=prize;entry('レース賞金',prize);s.rep+=v.retired?0:Math.max(1,5-place);gainXP(4+(5-place)*2);if(place===1&&!v.retired)s.wins++;s.lastTelemetry=v.telemetry;s.lastRace=circuit().name+' / '+(v.retired?'DNF':place+'位')+' / '+v.lap+'周 / 賞金 ¥'+fmt(prize);log(s.lastRace);s.raceSession=null;render();notice(v.retired?'リタイア':place+'位でフィニッシュ')}
+function batchLap(){const v=batchLive(),ses=s.raceSession;if(!v||v.lap>=5||v.waiting)return;let lap=++v.lap,pace=ses.pace||'balanced',pit=ses.pit||'no',sc=Math.random()<.1,accident=Math.random()<(pace==='push'?.1:pace==='safe'?.012:.04),failure=Math.random()<.025+Object.values(s.car.damage).reduce((n,x)=>n+x,0)/1500,base=90+raceTarget()*.07;
+let t=base+({safe:3,balanced:0,push:-3}[pace])+(100-v.tire)*.12+(100-s.car.condition)*.12-(circuitPower()-100)*.08+rnd(-4,4)+(sc?9:0);
+if(pit!=='no'&&(!v.pitted||pit==='repair')&&lap>=2){let p=pit==='tires'?(sc?2:7):(sc?4:10);t+=p;v.pitted=true;if(pit==='tires')v.tire=100;else s.car.condition=clamp(s.car.condition+15,0,100);ses.pit='no';v.events.push('LAP '+lap+' ピット +'+p+'秒')}
+if(sc&&pace==='push'){t+=5;v.events.push('LAP '+lap+' 黄旗違反 +5秒')}
+if(accident||failure){let part=accident?['body','brakes','suspension'][rnd(0,2)]:'engine',d=rnd(15,34)+(pace==='push'?8:0);s.car.damage[part]=clamp(s.car.damage[part]+d,0,100);s.car.condition=clamp(s.car.condition-rnd(8,18),0,100);t+=14;v.events.push('LAP '+lap+' '+partNames[part]+' 損傷 +'+d+'%');if(s.car.damage[part]>=70){v.waiting=true;v.paused=true;v.events.push('重大損傷：対応を選択')}}
+v.flags=sc?'yellow':'green';v.elapsed[0]+=t;for(let i=1;i<4;i++){let ai=v.rivals[i-1];if(ai.retired){v.elapsed[i]+=350;continue}let lt=base+rnd(-6,7)+i+(100-ai.tire)*.13+(sc?9:0);if(ai.tire<48&&!ai.pitted){lt+=7;ai.tire=100;ai.pitted=true;v.events.push('ライバル '+i+' ピットイン')}if(Math.random()<.035){lt+=14;ai.damage+=rnd(10,30);if(ai.damage>=65)ai.retired=true;v.events.push('ライバル '+i+' 故障')}ai.tire=clamp(ai.tire-rnd(11,21),0,100);v.elapsed[i]+=lt}v.tire=clamp(v.tire-(pace==='push'?23:pace==='safe'?10:16),0,100);v.positions=v.elapsed.map((x,i)=>lap/5-(x-Math.min(...v.elapsed))*.00008);v.telemetry.push({lap,time:t,tire:v.tire,condition:s.car.condition});v.events.push('LAP '+lap+' / '+t.toFixed(1)+'秒 / タイヤ '+v.tire+'%');log(v.events[v.events.length-1]);if(lap===5||v.retired){batchFinish();return}render()}
+const oldBatchAct=act;
+act=function(a,k){
+ if(a==='raceResolve'&&s.raceSession&&!s.raceSession.live){s.raceSession.live=batchInitial();render();return}
+ if(a==='batchPause'){let v=batchLive();if(v){v.paused=!v.paused;batchSchedule();render()}return}
+ if(a==='batchSpeed'){let v=batchLive();if(v){v.speed=v.speed===1?2:v.speed===2?4:1;batchSchedule();render()}return}
+ if(a==='batchLap'){batchLap();return}
+ if(a==='batchPace'){if(batchLive()&&['safe','balanced','push'].includes(k)){s.raceSession.pace=k;render()}return}
+ if(a==='batchPit'){if(batchLive()&&['no','tires','repair'].includes(k)){s.raceSession.pit=k;render()}return}
+ if(a==='batchIncident'){let v=batchLive();if(!v||!v.waiting)return;v.waiting=false;v.paused=true;if(k==='retire'){v.retired=true;batchFinish();return}if(k==='repair'){v.elapsed[0]+=15;s.car.condition=clamp(s.car.condition+15,0,100);v.events.push('緊急ピット +15秒')}render();return}
+ if(a==='teamTrain'){if(transact(2,12,650)){s.team.skill++;log('整備研修完了')}render();return}
+ if(a==='teamSponsor'){if(transact(1,5,450)){s.team.sponsor++;log('スポンサー契約獲得')}render();return}
+ if(a==='teamHire'){if(transact(1,4,800)){s.team.contracts++;s.staff++;log('スタッフ採用')}render();return}
+ if(a==='land'){if(transact(2,10,1200+s.property*700)){s.property++;log('事業用地取得')}render();return}
+ if(a==='repairPart'&&k in repairCosts){if(!s.car.damage[k])return;const price=Math.ceil(repairPrice(k)*(.9+.1/s.team.skill)),hours=Math.max(1,3-Math.floor(s.team.skill/2));if(transact(hours,12,price)){s.car.damage[k]=0;s.car.condition=clamp(s.car.condition+8,0,100);log(partNames[k]+' 修理完了')}render();return}
+ return oldBatchAct(a,k)
+};
+const baseRacePage=pages.race;pages.race=()=>baseRacePage()+batchPanel();
+const baseGaragePage=pages.garage;pages.garage=()=>baseGaragePage()+'<section class="panel"><h3>チーム運営</h3><p>整備技能 Lv.'+s.team.skill+' / 契約スタッフ '+s.team.contracts+' / スポンサー '+s.team.sponsor+'</p><div class="actions"><button class="btn" data-action="teamTrain">研修 ¥650</button><button class="btn" data-action="teamHire">採用 ¥800</button><button class="btn" data-action="teamSponsor">営業 ¥450</button></div></section>';
+const baseCityPage=pages.city;pages.city=()=>baseCityPage()+'<section class="panel"><h3>不動産・事業用地</h3><p>所有区画 '+s.property+' / 毎日維持費 ¥'+(s.property*20)+'</p><button class="btn" data-action="land">用地購入 ¥'+fmt(1200+s.property*700)+'</button></section>';
+const baseDay=nextDay;nextDay=function(){if(batchLive())return notice('レース中');let prev=s.money,teamPay=s.team.contracts*65+s.property*20,sponsorSales=s.team.sponsor*150;baseDay();s.money+=sponsorSales-teamPay;entry('スポンサー収入',sponsorSales);entry('追加労務・土地費',-teamPay);save()};
 render();})();
 </script></body></html>
