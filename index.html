@@ -25,14 +25,33 @@ if(a==='raceDecision'){if(!s.raceSession)return;if(s.raceSession.stage===1){if(!
 if(!['no','tires','repair'].includes(k))return;s.raceSession.pit=k;return act('raceResolve')}
 if(a==='sleep')return nextDay();if(a==='reset'){if(confirm('保存した進行状況をすべて消して最初から始めますか？')){s=init();tab='dashboard';render()}return}if(a==='eat'){if(transact(1,0,350)){s.mood=clamp(s.mood+16,0,100);s.energy=clamp(s.energy+12,0,100);log('食事をしてリフレッシュした。')}}if(a==='hobby'){if(transact(2,0,0)){s.mood=clamp(s.mood+25,0,100);s.energy=clamp(s.energy+5,0,100);log('趣味の時間を楽しんだ。')}}if(a==='train'){if(transact(2,20,0)){gainXP(7);log('ドライバーの訓練をした。')}}if(a==='work'){const jobs={delivery:[2,18,900,0,0],mechanic:[3,27,1400,2,0],freelance:[4,32,1500+s.rep*35,0,0],test:[3,24,1050,0,6]};const [h,en,w,parts,xp]=jobs[k];if(transact(h,en,0)){s.money+=w;entry('労働報酬',w);s.parts+=parts;gainXP(xp);s.mood=clamp(s.mood-2,0,100);log(`仕事完了。+¥${fmt(w)}${parts?' / パーツ +'+parts:''}${xp?' / XP +'+xp:''}`);notice('仕事の報酬を受け取った')}}if(a==='build'){let price=cityPrice(k);if(cityCount()>=24)return notice('建設可能な土地がない');if(transact(2,10,price)){s.city[k]++;if(k==='homes')s.people+=18;if(k==='garage')s.staff++;log(`${defs[k].name}が完成した！`);notice('施設を建設した')}}if(a==='upgrade'){const price=800+s.car[k]*650,n=1+s.car[k];if(s.parts<n)return notice('パーツが足りない');if(transact(2,12,price)){s.parts-=n;s.car[k]++;log(`車両の${k}を Lv.${s.car[k]} に強化。`);notice('マシン性能アップ')}}if(a==='repair'){if(transact(1,8,600)){s.car.condition=clamp(s.car.condition+45,0,100);log('車両を整備した。')}}if(a==='automate'){const price=Math.round(autoDefs[k].cost*(1+s.autos[k]*.8));if(transact(0,0,price)){s.autos[k]++;log(`${autoDefs[k].name}を導入。毎朝の処理が強化された。`);notice('自動化を導入した')}}if(a==='explore'){if(s.inventory.length>=18)return notice('装備枠が満杯。売却して空きを作ろう');if(transact(3,25,200)){const rare=Math.random()<.035?3:Math.random()<.16?2:Math.random()<.42?1:0,type=['motor','aero','tire','tool'][rnd(0,3)],item={id:'i'+Date.now()+rnd(0,9999),rare,name:itemName(type,rare),stat:(rare+1)*rnd(3,7)+Math.floor(s.expeditions/6),value:(rare+1)*rnd(200,550)};s.inventory.push(item);s.expeditions++;s.parts+=rnd(0,2);log(`${item.name}（戦力 +${item.stat}）を発見！`);notice('装備を発見した！')}}if(a==='equip'){if(s.inventory.some(i=>i.id===k)){s.equipped=k;log('装備を変更した。')}}if(a==='sell'){const item=s.inventory.find(i=>i.id===k);if(item){s.money+=item.value;entry('部品売却',item.value);s.inventory=s.inventory.filter(i=>i.id!==k);if(s.equipped===k)s.equipped=null;log(`${item.name}を売却した。`)}}if(a==='raceResolve'){if(raceAnim)return;const strategy=s.raceSession||{pace:'balanced',pit:'no'};const bonus={safe:-5,balanced:0,push:12}[strategy.pace]+{no:0,tires:8,repair:-2}[strategy.pit];const risk=strategy.pace==='push'?.22:strategy.pace==='safe'?.02:.07;const failure=Math.random()<risk;const p=circuitPower()+bonus-(failure?32:0),target=raceTarget(),variance=rnd(-17,17),opponents=[target+rnd(-8,7),target+rnd(-12,4),target+rnd(-15,10)],player=p+variance;const place=1+opponents.filter(v=>v>player).length;const prize=Math.round([2600+s.races*140,1200+s.races*65,550+s.races*30,150][place-1]*circuit().prize);s.races++;s.money+=prize;entry('レース賞金',prize);s.rep+=Math.max(1,5-place);s.mood=clamp(s.mood+(place===1?13:place===4?-8:5),0,100);s.car.condition=clamp(s.car.condition-rnd(12,23)-(strategy.pace==='push'?12:0)+(strategy.pace==='safe'?5:0)+(strategy.pit==='repair'?18:0)+s.car.reliability,0,100);gainXP(4+(5-place)*2);if(place===1)s.wins++;s.lastRace=`${circuit().name} / ${place}位 / 4台　報酬 ¥${fmt(prize)}。${failure?'機械トラブル発生。':''} ペース：${strategy.pace} / ピット：${strategy.pit}。${place===1?'優勝！チームの名声が高まった。':'開発と練習で順位を上げよう。'}`;log(`レース ${place}位。賞金 ¥${fmt(prize)} を獲得。`);s.raceSession=null;render();animateRace(place);return}render()}
 function syncCameraButtons(){document.querySelectorAll('[data-camera]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.camera===cameraMode)))}
+
+function drawPerspectiveRoad(g,w,h,progress,lean){
+ const count=46,base=elevationAt(progress),id=s.raceSession?.circuit||circuitId;
+ const scale=id==='mountain'?2.2:id==='endurance'?1.2:.7;
+ function point(z,side){
+  const depth=z/count,near=1/(.16+depth*2.6);
+  const difference=elevationAt(progress+(1-depth)*.18)-base;
+  const curve=Math.sin(progress*23+depth*3.5)*65*(1-depth)+lean*26;
+  return {x:w/2+curve+side*38*near,y:148+(h-148)*(1-depth*depth)-difference*near*.25*scale};
+ }
+ function quad(a,b,c,d,color){g.fillStyle=color;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.lineTo(c.x,c.y);g.lineTo(d.x,d.y);g.closePath();g.fill()}
+ for(let z=count-1;z>=0;z--){
+  let q=z/count,r=(z+1)/count;
+  quad(point(q,-1.7),point(q,1.7),point(r,1.7),point(r,-1.7),z%2?'#314b45':'#39554d');
+  quad(point(q,-1),point(q,1),point(r,1),point(r,-1),z%2?'#24323e':'#293846');
+  quad(point(q,-1.06),point(q,-1),point(r,-1),point(r,-1.06),z%3===0?'#e9e8e3':'#c94b57');
+  quad(point(q,1),point(q,1.06),point(r,1.06),point(r,1),z%3===0?'#e9e8e3':'#c94b57');
+  if(z%5<2)quad(point(q,-.026),point(q,.026),point(r,.026),point(r,-.026),'#dfd8aa');
+  if(z%6===0){g.strokeStyle='#e0d6a8';g.lineWidth=2;for(const side of [-1.85,1.85]){let p=point(q,side),height=7+22/(.3+q);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(p.x,p.y-height);g.stroke()}}
+ }
+}
 function racePerspective(mode,positions){
 const c=$('#track');if(!c)return;const g=c.getContext('2d'),w=c.width,h=c.height;
 g.clearRect(0,0,w,h);const gradient=g.createLinearGradient(0,0,0,h);gradient.addColorStop(0,'#142e53');gradient.addColorStop(.52,'#3d6877');gradient.addColorStop(.53,'#466b63');gradient.addColorStop(1,'#202f3a');g.fillStyle=gradient;g.fillRect(0,0,w,h);
 const p=Math.max(0,positions[0]||0),phase=p*Math.PI*(circuit().shape==='mountain'?17:circuit().shape==='harbor'?7:10),corner=Math.sin(phase),targetLean=corner*1.0;cameraLean+=(targetLean-cameraLean)*.085;const shift=corner*72-cameraLean*18,curve=cameraLean*.22;const speed=72+Math.abs(Math.cos(phase))*112;cameraVelocity+=(speed-cameraVelocity)*.08;const shake=Math.sin(cameraFrame*1.3)*(cameraVelocity/184)*1.9;cameraFrame++;
 for(let i=0;i<12;i++){const x=i*81+((i*23)%47);g.fillStyle='#193546';g.fillRect(x,95+(i%3)*10,48,106);g.fillStyle='#b4d9c1';for(let j=0;j<3;j++)g.fillRect(x+8+j*12,112+(i%3)*10,4,5)}
-terrainBackdrop(g,w,h);g.fillStyle='#1c2731';g.beginPath();g.moveTo(325+shift,174);g.lineTo(475+shift,174);g.lineTo(w+180+shift,h);g.lineTo(-180+shift,h);g.closePath();g.fill();
-g.strokeStyle='#bacbcc';g.lineWidth=5;g.beginPath();g.moveTo(330+shift,174);g.lineTo(-155+shift,h);g.moveTo(470+shift,174);g.lineTo(w+155+shift,h);g.stroke();
-g.strokeStyle='#f2e7bb';g.lineWidth=3;g.setLineDash([17,15]);for(let side of [-1,1]){g.beginPath();g.moveTo(400+shift+side*12,176);g.lineTo(400+shift+side*105,h);g.stroke()}g.setLineDash([]);
+terrainBackdrop(g,w,h);drawPerspectiveRoad(g,w,h,p,cameraLean);
 g.save();g.translate(w/2+shift/3+shake,255+Math.sin(cameraFrame*.4)*cameraVelocity/85);g.rotate(curve*.11);
 if(mode==='chase'){
 g.fillStyle='#12202a';g.beginPath();g.ellipse(0,88,159,20,0,0,Math.PI*2);g.fill();
