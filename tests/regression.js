@@ -10,7 +10,7 @@ function boot(data={}){
  const document={querySelector:q=>q==='#app'?app:null,querySelectorAll:()=>[],createElement:()=>({remove(){}}),body:{appendChild(){}}};
  const localStorage={getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=v};
  const context={document,localStorage,requestAnimationFrame:()=>1,cancelAnimationFrame:()=>{},clearTimeout:()=>{},setTimeout:()=>++tick,confirm:()=>true,Math,Date,JSON,Number,String,Object,Array,console};
- const result=vm.runInNewContext('('+patched.trim()+')',context);
+ const result=vm.runInNewContext(patched.trim(),context);
  assert(result,'Initialization returned no game interface');return {game:result,storage,app};
 }
 const legacy={day:43,hour:9,money:5000,car:{engine:2,handling:3,condition:77},city:{garage:1}};
